@@ -51,7 +51,7 @@ This is the core promise of this repo: **each algorithm is the one the paper pro
 | Forward-looking greedy heuristic (baseline) | Section 5.7 | [`crpsp/heuristic.py`](crpsp/heuristic.py) | `tests/test_heuristic.py`: always solves, never beats the A\* optimum |
 | Tables 2–9 (experiments) | Section 5 | [`experiments/table2_mip.py`](experiments/table2_mip.py) … [`table9_voting_vs_heuristic.py`](experiments/table9_voting_vs_heuristic.py) | `tests/test_experiments_smoke.py` (wiring only — see §5) |
 
-**Full test suite: 62 tests, all passing** (`.venv/Scripts/python.exe -m pytest`, ~40s).
+**Full test suite: 63 tests, all passing** — 62 fast (`.venv/Scripts/python.exe -m pytest`, ~40s) + 1 `@pytest.mark.slow` cross-check (`-m slow`, ~5s, excluded by default).
 
 ### Standard-CRP mode (extension beyond the paper)
 
@@ -82,7 +82,7 @@ experiments/
   table2_mip.py .. table9_voting_vs_heuristic.py   one script per paper table
 configs/
   default.yaml         every hyperparameter from Table 10, plus env/model settings
-tests/                 61 unit/integration tests + 1 slow cross-check
+tests/                 62 unit/integration tests + 1 slow cross-check (63 total)
 docs/superpowers/
   specs/, plans/        the original design spec and implementation plan for this repo
 REPRODUCTION_NOTES.md  every place the paper was ambiguous, what we chose, and why
@@ -138,8 +138,8 @@ python experiments/table3_astar.py --full
 python experiments/table4_ppo_vs_astar.py --full --ckpt checkpoints/m0.pt
 
 # 4. Ablations (Tables 5, 6-7) — each spawns fresh PPOTrainer instances
-python experiments/table5_attention_ablation.py --full
-python experiments/table6_7_reward_ablation.py --full
+python experiments/table5_attention_ablation.py --full   # --models 5 --iterations 3000 --eval-instances 50 by default
+python experiments/table6_7_reward_ablation.py --full    # 2 LR x 3 gamma x 3 N x 3 eps x 6 runs x 2 reward modes = 648 training runs, capped at 1000 iters each
 
 # 5. Ensembles (Tables 8, 9) — need all 10 checkpoints from step 1
 python experiments/table8_ensemble.py --full --ckpt-dir checkpoints/
@@ -148,13 +148,23 @@ python experiments/table9_voting_vs_heuristic.py --full --ckpt-dir checkpoints/
 
 Results land in `results/*.csv`, checkpoints + per-iteration metrics in `checkpoints/`.
 
+**Before committing a server's worth of time to step 4 or 6** (`table6_7_reward_ablation.py` alone is 648 independent training runs), get a real timing number on that machine first — this repo intentionally does not print a fabricated ETA:
+
+```bash
+# time a handful of PPO iterations on the target machine, then extrapolate linearly
+python experiments/train_ppo.py --full --iterations 20 --out /tmp/timing.pt
+# table5/table8 accept the same kind of override for a cheap dry run:
+python experiments/table5_attention_ablation.py --full --models 1 --iterations 20 --eval-instances 5
+```
+Table 2's and Table 3's own per-instance wall-clock times are already reported inside the tables themselves (Section 5.1-5.2 of the paper) — no separate timing probe needed for those two.
+
 **Sanity targets from the paper** (Section 5) to check your server run against: PPO gap ≈ 7.33% vs. A\* optimal at (N=15,S_y=5,S_v=5,T_y=5); attention converges in ~50–200 iterations vs. ~1500–2200 without (Table 5); Majority Voting gap ≈ 3.33%, Stacking noticeably *worse* (~44%) — that last one being counter-intuitively bad is a real reported finding, not a bug if you reproduce it.
 
 ---
 
 ## 7. Known deviations from the literal paper text
 
-Full list with justification: **[`REPRODUCTION_NOTES.md`](REPRODUCTION_NOTES.md)** (21 documented items). The ones that matter most if you're about to build on this code:
+Full list with justification: **[`REPRODUCTION_NOTES.md`](REPRODUCTION_NOTES.md)** (23 documented items — includes a second, independent adversarial audit pass that fixed a Table 5 measurement bug and disclosed a critic-loss `mean` vs. `sum` deviation; see items #22-23). The ones that matter most if you're about to build on this code:
 
 - **MIP solver**: OR-Tools CP-SAT, not Gurobi (license-free). Same model, same objective weights (ω1:ω2 = 10:1); optimal *objective values* coincide with A\* (verified), but wall-clock times are not comparable to the paper's Table 2 Gurobi numbers.
 - **Two underspecified paper details you'll need to pick a value for if you tune them**: the terminal "large positive reward" magnitude (default `10.0`, `notes #1`) and the Tables 5–7 "convergence iteration" criterion (`notes #10`, implemented in `crpsp.ppo.convergence_iteration`).

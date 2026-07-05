@@ -14,7 +14,8 @@ class Trainer:
     def __init__(self, config: Config, device: torch.device):
         self.config = config
         self.device = device
-        set_seed(config.train.seed)
+        self.seed = config.train.seed
+        set_seed(self.seed)
         self.start_iteration = 0
         self.actor = Actor(config.model.hidden_dim, config.model.num_gru_layers).to(device)
         self.critic = Critic(config.model.hidden_dim).to(device)
@@ -43,7 +44,7 @@ class Trainer:
         self.start_iteration = ckpt.get("start_iteration", 0)
 
     def _sample_batch(self) -> SlotStowageEnv:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(self.seed)
         data = CfgDataset(
             P=self.config.env.num_ports,
             W=self.config.env.num_weight_classes,
@@ -52,15 +53,19 @@ class Trainer:
             S=self.config.train.batch_size,
             rng=rng,
         )
-        return SlotStowageEnv(self.config.env, self.config.reward, data.to(self.device))
+        return SlotStowageEnv(self.config.env, self.config.reward, data.to(self.device),
+                              rng=np.random.default_rng(self.seed))
 
     def train(self, num_iterations: int | None = None) -> None:
         if num_iterations is None:
             num_iterations = self.config.train.num_iterations
-        env = self._sample_batch()
         total = self.start_iteration + num_iterations
+        fresh_interval = max(1, total // 100)
 
         for iteration in range(self.start_iteration, total):
+            if iteration % fresh_interval == 0:
+                env = self._sample_batch()
+
             episode_log_probs: list[torch.Tensor] = []
             episode_rewards: list[float] = []
             episode_values: list[float] = []

@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 from spp_ac.config import Config
 from spp_ac.training.trainer import Trainer
-from spp_ac.generate import generate_plan, plot_stowage_plan
+from spp_ac.generate import plot_stowage_plan
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,7 +22,8 @@ def parse_args() -> argparse.Namespace:
     gen_parser = sub.add_parser("generate", help="Generate stowage plans from trained model")
     gen_parser.add_argument("--checkpoint", type=str, required=True, help="Checkpoint path")
     gen_parser.add_argument("--num-instances", type=int, default=1, help="Number of instances")
-    gen_parser.add_argument("--greedy", action="store_true", default=True, help="Greedy decoding")
+    gen_parser.add_argument("--sample", action="store_true", default=False,
+                            help="Sample from policy distribution (default: greedy argmax)")
     gen_parser.add_argument("--plot", type=str, default=None, help="Save plot to path")
     gen_parser.add_argument("--device", type=str, default="auto", help="Device: auto, cpu, or cuda")
 
@@ -44,6 +45,7 @@ def cmd_train(args: argparse.Namespace, config: Config) -> None:
         config.train.lr = args.lr
 
     device = _resolve_device(args.device, config)
+    print(f"Using device: {device}")
     trainer = Trainer(config, device)
 
     if args.resume:
@@ -53,17 +55,19 @@ def cmd_train(args: argparse.Namespace, config: Config) -> None:
     trainer.train()
 
     if args.checkpoint:
+        Path(args.checkpoint).parent.mkdir(parents=True, exist_ok=True)
         trainer.save_checkpoint(args.checkpoint)
         print(f"Checkpoint saved to {args.checkpoint}")
 
 
 def cmd_generate(args: argparse.Namespace, config: Config) -> None:
     device = _resolve_device(args.device, config)
+    print(f"Using device: {device}")
     trainer = Trainer(config, device)
     trainer.load_checkpoint(args.checkpoint)
     print(f"Loaded checkpoint from {args.checkpoint}")
 
-    plans = trainer.generate_plan(num_instances=args.num_instances, greedy=args.greedy)
+    plans = trainer.generate_plan(num_instances=args.num_instances, greedy=not args.sample)
 
     for i, plan in enumerate(plans):
         print(f"\nInstance {i + 1}: reward={plan['reward']:.4f}")

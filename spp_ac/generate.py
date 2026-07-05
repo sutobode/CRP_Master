@@ -1,6 +1,10 @@
 import torch
 import numpy as np
 from pathlib import Path
+from spp_ac.config import Config
+from spp_ac.data.cdg import CfgDataset
+from spp_ac.env.spp_env import SlotStowageEnv
+from spp_ac.models.actor import Actor
 
 
 def _import_plt():
@@ -9,10 +13,6 @@ def _import_plt():
         return plt
     except ImportError:
         return None
-from spp_ac.config import Config
-from spp_ac.data.cdg import CfgDataset
-from spp_ac.env.spp_env import SlotStowageEnv
-from spp_ac.models.actor import Actor
 
 
 def generate_plan(

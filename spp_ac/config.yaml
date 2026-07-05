@@ -4,6 +4,8 @@ env:
   num_container_types: 2
   bay_rows: 12
   bay_tiers: 6
+  row_weight_max: 50.0
+  non_loadable: []
 
 reward:
   lambda_1: 0.7

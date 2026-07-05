@@ -11,6 +11,8 @@ class EnvConfig:
     num_container_types: int = 2
     bay_rows: int = 12
     bay_tiers: int = 6
+    row_weight_max: float = 50.0
+    non_loadable: list | None = None
 
 
 @dataclass
@@ -61,7 +63,8 @@ class Config:
         data = {
             "env": {"num_ports": self.env.num_ports, "num_weight_classes": self.env.num_weight_classes,
                     "num_container_types": self.env.num_container_types, "bay_rows": self.env.bay_rows,
-                    "bay_tiers": self.env.bay_tiers},
+                    "bay_tiers": self.env.bay_tiers, "row_weight_max": self.env.row_weight_max,
+                    "non_loadable": self.env.non_loadable},
             "reward": {"lambda_1": self.reward.lambda_1, "lambda_2": self.reward.lambda_2,
                        "lambda_3": self.reward.lambda_3, "alpha_1": self.reward.alpha_1,
                        "alpha_2": self.reward.alpha_2, "alpha_3": self.reward.alpha_3},

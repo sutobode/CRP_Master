@@ -28,9 +28,11 @@ class SlotStowageEnv:
     def reset(self) -> tuple[torch.Tensor, torch.Tensor]:
         self.container_state = self.container_data[self.current_idx].clone()
         self.current_idx = (self.current_idx + 1) % len(self.container_data)
-        row_weight_max = [50.0] * self.R
-        self.bay = BayState(self.R, self.T, row_weight_max)
-        self.sequence = StowageSequence(self.R, self.R, self.T)
+        row_weight_max = [self.env_cfg.row_weight_max] * self.R
+        non_loadable_bay = {(r, t) for r, t in (self.env_cfg.non_loadable or [])}
+        non_loadable_seq = {(b, r, t) for b in (0, 1) for r, t in non_loadable_bay}
+        self.bay = BayState(self.R, self.T, row_weight_max, non_loadable_bay)
+        self.sequence = StowageSequence(self.R, self.R, self.T, non_loadable_seq)
         self.tracker = RewardTracker(self.reward_cfg, self.R, self.T, row_weight_max)
         self._actual_step = 0
         return self.bay.get_matrix(), self.container_state

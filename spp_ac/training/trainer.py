@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+from pathlib import Path
 from spp_ac.config import Config
 from spp_ac.data.cdg import CfgDataset
 from spp_ac.env.spp_env import SlotStowageEnv
@@ -13,10 +14,29 @@ class Trainer:
     def __init__(self, config: Config, device: torch.device):
         self.config = config
         self.device = device
+        self.start_iteration = 0
         self.actor = Actor(config.model.hidden_dim, config.model.num_gru_layers).to(device)
         self.critic = Critic(config.model.hidden_dim).to(device)
         self.actor_optim = optim.Adam(self.actor.parameters(), lr=config.train.lr)
         self.critic_optim = optim.Adam(self.critic.parameters(), lr=config.train.lr)
+
+    def save_checkpoint(self, path: str | Path) -> None:
+        torch.save({
+            "actor_state_dict": self.actor.state_dict(),
+            "critic_state_dict": self.critic.state_dict(),
+            "actor_optim_state_dict": self.actor_optim.state_dict(),
+            "critic_optim_state_dict": self.critic_optim.state_dict(),
+            "config": self.config,
+            "start_iteration": self.start_iteration,
+        }, path)
+
+    def load_checkpoint(self, path: str | Path) -> None:
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        self.actor.load_state_dict(ckpt["actor_state_dict"])
+        self.critic.load_state_dict(ckpt["critic_state_dict"])
+        self.actor_optim.load_state_dict(ckpt["actor_optim_state_dict"])
+        self.critic_optim.load_state_dict(ckpt["critic_optim_state_dict"])
+        self.start_iteration = ckpt.get("start_iteration", 0)
 
     def _sample_batch(self) -> SlotStowageEnv:
         rng = np.random.default_rng()
@@ -34,8 +54,9 @@ class Trainer:
         if num_iterations is None:
             num_iterations = self.config.train.num_iterations
         env = self._sample_batch()
+        total = self.start_iteration + num_iterations
 
-        for iteration in range(num_iterations):
+        for iteration in range(self.start_iteration, total):
             episode_log_probs: list[torch.Tensor] = []
             episode_rewards: list[float] = []
             episode_values: list[float] = []
@@ -93,8 +114,16 @@ class Trainer:
             nn.utils.clip_grad_norm_(self.critic.parameters(), self.config.train.grad_clip)
             self.critic_optim.step()
 
-            if iteration % 100 == 0:
+            if iteration % 100 == 0 or iteration == total - 1:
                 avg_reward = rewards_t.mean().item()
                 avg_value = values_t.mean().item()
-                print(f"Iter {iteration:5d} | R={avg_reward:.4f} | V={avg_value:.4f} | "
+                print(f"Iter {iteration:5d}/{total} | R={avg_reward:.4f} | V={avg_value:.4f} | "
                       f"Adv={advantages.mean().item():.4f} | ActorL={actor_loss.item():.6f} | CriticL={critic_loss.item():.6f}")
+
+    def generate_plan(
+        self,
+        num_instances: int = 1,
+        greedy: bool = True,
+    ) -> list[dict]:
+        from spp_ac.generate import generate_plan as _generate
+        return _generate(self.actor, self.config, num_instances, greedy, self.device)

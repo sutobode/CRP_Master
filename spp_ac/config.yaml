@@ -1,0 +1,26 @@
+env:
+  num_ports: 6
+  num_weight_classes: 8
+  num_container_types: 2
+  bay_rows: 12
+  bay_tiers: 6
+
+reward:
+  lambda_1: 0.7
+  lambda_2: 0.3
+  lambda_3: 0.01
+  alpha_1: 3.0
+  alpha_2: 3.0
+  alpha_3: 3.0
+
+model:
+  hidden_dim: 128
+  num_gru_layers: 4
+
+train:
+  batch_size: 512
+  num_iterations: 20000
+  lr: 0.00001
+  gamma: 0.99
+  grad_clip: 3.0
+  seed: 42

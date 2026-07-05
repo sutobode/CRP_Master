@@ -83,6 +83,9 @@ class Trainer:
                 done = False
                 while not done:
                     mask = env.get_mask().to(self.device)
+                    if mask.sum() == 0:
+                        break
+
                     probs, _, d_t, h_state = self.actor(
                         bay, container, prev_embed, h_state,
                     )

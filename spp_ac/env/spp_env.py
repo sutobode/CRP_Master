@@ -40,20 +40,24 @@ class SlotStowageEnv:
     def _compute_mask(self) -> torch.Tensor:
         return (self.container_state[:, 3] > 0).float()
 
+    def _is_terminal(self) -> bool:
+        return self._actual_step >= len(self.sequence) or remaining_quantity(self.container_state) == 0
+
     def step(
         self, action: int
     ) -> tuple[torch.Tensor, torch.Tensor, float, bool]:
-        if self._actual_step >= len(self.sequence):
+        if self._is_terminal():
             reward = self.tracker.compute()
             return self.bay.get_matrix(), self.container_state, reward, True
 
         new_container, valid = select_container(self.container_state, action)
         if not valid:
+            done = self._is_terminal()
             return (
                 self.bay.get_matrix(),
                 self.container_state,
                 0.0,
-                False,
+                done,
             )
         self.container_state = new_container
         slot = self.sequence[self._actual_step]
@@ -62,7 +66,7 @@ class SlotStowageEnv:
 
         if is_zero_group:
             self._actual_step += 1
-            done = self._actual_step >= len(self.sequence) or remaining_quantity(self.container_state) == 0
+            done = self._is_terminal()
             return self.bay.get_matrix(), self.container_state, 0.0, done
 
         ctype = int(self.container_state[action, 2].item())
@@ -72,7 +76,7 @@ class SlotStowageEnv:
         allowed_type = int(self.bay.state[2, row, tier].item())
         if ctype == 2 and allowed_type not in (2, 3):
             self.container_state = new_container
-            done = remaining_quantity(self.container_state) == 0
+            done = self._is_terminal()
             return (
                 self.bay.get_matrix(),
                 self.container_state,
@@ -87,7 +91,7 @@ class SlotStowageEnv:
         if ctype == 2:
             self.sequence.mark_occupied(self._actual_step - 1)
 
-        done = self._actual_step >= len(self.sequence) or remaining_quantity(self.container_state) == 0
+        done = self._is_terminal()
         reward = self.tracker.compute() if done else 0.0
         return self.bay.get_matrix(), self.container_state, reward, done
 

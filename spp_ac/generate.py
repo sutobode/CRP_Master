@@ -49,10 +49,15 @@ def generate_plan(
             done = False
             while not done:
                 mask = env.get_mask().to(device)
+                if mask.sum() == 0:
+                    break
+
                 probs, _, d_t, h_state = actor(bay, container, prev_embed, h_state)
                 scaled_probs = probs * mask
                 probs_sum = scaled_probs.sum(dim=-1, keepdim=True)
-                scaled_probs = scaled_probs / (probs_sum + 1e-10)
+                if probs_sum.item() == 0:
+                    break
+                scaled_probs = scaled_probs / probs_sum
 
                 if greedy:
                     action = scaled_probs.argmax(dim=-1)

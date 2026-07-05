@@ -23,6 +23,7 @@ class SlotStowageEnv:
         self.R = env_cfg.bay_rows
         self.T = env_cfg.bay_tiers
         self.current_idx = 0
+        self._zero_group_idx = container_data.size(1) - 1
 
     def reset(self) -> tuple[torch.Tensor, torch.Tensor]:
         self.container_state = self.container_data[self.current_idx].clone()
@@ -55,6 +56,13 @@ class SlotStowageEnv:
         self.container_state = new_container
         slot = self.sequence[self._actual_step]
         bay_idx, row, tier = slot
+        is_zero_group = action == self._zero_group_idx
+
+        if is_zero_group:
+            self._actual_step += 1
+            done = self._actual_step >= len(self.sequence) or remaining_quantity(self.container_state) == 0
+            return self.bay.get_matrix(), self.container_state, 0.0, done
+
         ctype = int(self.container_state[action, 2].item())
         pod = int(self.container_state[action, 0].item())
         weight = int(self.container_state[action, 1].item())

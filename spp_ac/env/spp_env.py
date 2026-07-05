@@ -32,7 +32,6 @@ class SlotStowageEnv:
         self.sequence = StowageSequence(self.R, self.R, self.T)
         self.tracker = RewardTracker(self.reward_cfg, self.R, self.T, row_weight_max)
         self._actual_step = 0
-        self._total_slots = len(self.sequence)
         return self.bay.get_matrix(), self.container_state
 
     def _compute_mask(self) -> torch.Tensor:
@@ -41,7 +40,7 @@ class SlotStowageEnv:
     def step(
         self, action: int
     ) -> tuple[torch.Tensor, torch.Tensor, float, bool]:
-        if self._actual_step >= self._total_slots:
+        if self._actual_step >= len(self.sequence):
             reward = self.tracker.compute()
             return self.bay.get_matrix(), self.container_state, reward, True
 
@@ -63,11 +62,12 @@ class SlotStowageEnv:
         allowed_type = int(self.bay.state[2, row, tier].item())
         if ctype == 2 and allowed_type not in (2, 3):
             self.container_state = new_container
+            done = remaining_quantity(self.container_state) == 0
             return (
                 self.bay.get_matrix(),
                 self.container_state,
                 0.0,
-                False,
+                done,
             )
 
         self.bay = self.bay.load(row, tier, pod, weight, ctype)
@@ -75,11 +75,9 @@ class SlotStowageEnv:
         self._actual_step += 1
 
         if ctype == 2:
-            released = self.sequence.mark_occupied(self._actual_step - 1)
-            if released:
-                self._total_slots -= len(released)
+            self.sequence.mark_occupied(self._actual_step - 1)
 
-        done = self._actual_step >= self._total_slots or remaining_quantity(self.container_state) == 0
+        done = self._actual_step >= len(self.sequence) or remaining_quantity(self.container_state) == 0
         reward = self.tracker.compute() if done else 0.0
         return self.bay.get_matrix(), self.container_state, reward, done
 

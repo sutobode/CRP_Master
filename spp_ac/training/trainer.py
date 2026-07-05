@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from pathlib import Path
-from spp_ac.config import Config
+from spp_ac.config import Config, set_seed
 from spp_ac.data.cdg import CfgDataset
 from spp_ac.env.spp_env import SlotStowageEnv
 from spp_ac.models.actor import Actor
@@ -14,6 +14,7 @@ class Trainer:
     def __init__(self, config: Config, device: torch.device):
         self.config = config
         self.device = device
+        set_seed(config.train.seed)
         self.start_iteration = 0
         self.actor = Actor(config.model.hidden_dim, config.model.num_gru_layers).to(device)
         self.critic = Critic(config.model.hidden_dim).to(device)
@@ -31,7 +32,10 @@ class Trainer:
         }, path)
 
     def load_checkpoint(self, path: str | Path) -> None:
-        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {path}")
+        ckpt = torch.load(str(path), map_location=self.device, weights_only=False)
         self.actor.load_state_dict(ckpt["actor_state_dict"])
         self.critic.load_state_dict(ckpt["critic_state_dict"])
         self.actor_optim.load_state_dict(ckpt["actor_optim_state_dict"])
@@ -119,6 +123,8 @@ class Trainer:
                 avg_value = values_t.mean().item()
                 print(f"Iter {iteration:5d}/{total} | R={avg_reward:.4f} | V={avg_value:.4f} | "
                       f"Adv={advantages.mean().item():.4f} | ActorL={actor_loss.item():.6f} | CriticL={critic_loss.item():.6f}")
+
+        self.start_iteration = total
 
     def generate_plan(
         self,

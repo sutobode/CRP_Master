@@ -1,7 +1,7 @@
 import argparse
 import torch
 from pathlib import Path
-from spp_ac.config import Config
+from spp_ac.config import Config, set_seed
 from spp_ac.training.trainer import Trainer
 from spp_ac.generate import plot_stowage_plan
 
@@ -9,6 +9,7 @@ from spp_ac.generate import plot_stowage_plan
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="SPP-AC: Slot Stowage Optimization via Improved Actor-Critic")
     parser.add_argument("--config", type=str, default="spp_ac/config.yaml", help="Path to config YAML")
+    parser.add_argument("--seed", type=int, default=None, help="Override random seed")
     sub = parser.add_subparsers(dest="command")
 
     train_parser = sub.add_parser("train", help="Train a model")
@@ -94,6 +95,9 @@ def cmd_generate(args: argparse.Namespace, config: Config) -> None:
 def main():
     args = parse_args()
     config = Config.from_yaml(args.config)
+
+    seed = args.seed if args.seed is not None else config.train.seed
+    set_seed(seed)
 
     if args.command == "generate":
         cmd_generate(args, config)

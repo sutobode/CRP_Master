@@ -5,6 +5,9 @@ description = "Faithful reproduction of Wang et al. (2025) CRPSP hybrid learning
 requires-python = ">=3.11"
 dependencies = ["torch", "ortools", "xgboost", "scikit-learn", "numpy", "pyyaml"]
 
+[tool.setuptools.packages.find]
+include = ["crpsp*", "spp_ac*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["slow: excluded by default; run with -m slow"]

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from .instance import Instance, slot_map
 from .lower_bound import lower_bound, must_precede_pairs
+from .transfer import closure_crp, closure_crpsp
 
 Yard = tuple[tuple[int, ...], ...]
 VHeights = tuple[int, ...]
@@ -29,28 +30,10 @@ class AStarResult:
     trajectory: list[tuple[Yard, VHeights, tuple[int, int]]] = field(default_factory=list)
 
 
-def _closure(yard: list[list[int]], vessel: list[list[int]], slot_of) -> int:
-    """Execute all feasible transfers (Eq 23 respected); return how many were done."""
-    n = 0
-    moved = True
-    while moved:
-        moved = False
-        for stack in yard:
-            if not stack:
-                continue
-            c = stack[-1]
-            vs, vt = slot_of[c]
-            h_new = len(vessel[vs]) + 1
-            if len(vessel[vs]) == vt and all(len(vessel[j]) >= h_new for j in range(vs)):
-                vessel[vs].append(stack.pop())
-                n += 1
-                moved = True
-    return n
-
-
 def solve_astar(inst: Instance, time_limit_s: float | None = None,
                 node_limit: int | None = None) -> AStarResult:
-    slot_of = slot_map(inst)
+    crp = inst.mode == "crp"
+    slot_of = slot_map(inst) if not crp else None
     precede = must_precede_pairs(inst)
     s_y, s_v, t_y = inst.s_y, inst.s_v, inst.t_y
 
@@ -58,11 +41,22 @@ def solve_astar(inst: Instance, time_limit_s: float | None = None,
         # vessel stack contents are determined by the stowage plan prefix
         return [list(inst.stowage[i][:vh[i]]) for i in range(s_v)]
 
+    def run_closure(yard: list[list[int]], vh: VHeights) -> tuple[int, VHeights]:
+        """Apply transfer closure in the right mode.
+
+        The auxiliary state `vh` is vessel heights (CRPSP) or a 1-tuple with
+        the next retrieval priority (CRP)."""
+        if crp:
+            n, nxt = closure_crp(yard, vh[0])
+            return n, (nxt,)
+        vessel = rebuild_vessel(vh)
+        n = closure_crpsp(yard, vessel, slot_of)
+        return n, tuple(len(v) for v in vessel)
+
     yard0 = [list(s) for s in inst.yard]
-    vessel0: list[list[int]] = [[] for _ in range(s_v)]
-    g0 = _closure(yard0, vessel0, slot_of)
+    root_aux: VHeights = (1,) if crp else tuple(0 for _ in range(s_v))
+    g0, root_vh = run_closure(yard0, root_aux)
     root_yard: Yard = tuple(tuple(s) for s in yard0)
-    root_vh: VHeights = tuple(len(v) for v in vessel0)
 
     counter = itertools.count()
     start = time.perf_counter()
@@ -92,10 +86,8 @@ def solve_astar(inst: Instance, time_limit_s: float | None = None,
                     continue
                 ny = [list(st) for st in yard]
                 ny[d].append(ny[s].pop())
-                nv = rebuild_vessel(vh)
-                moved = _closure(ny, nv, slot_of)
+                moved, child_vh = run_closure(ny, vh)
                 child_yard: Yard = tuple(tuple(st) for st in ny)
-                child_vh: VHeights = tuple(len(v) for v in nv)
                 ng = g + 1 + moved
                 ckey = (tuple(sorted(child_yard)), child_vh)
                 if ng < best_g.get(ckey, float("inf")):

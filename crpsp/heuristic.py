@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from .instance import Instance, slot_map
 from .lower_bound import must_precede_pairs
+from .transfer import closure_crpsp
 
 
 @dataclass
@@ -35,18 +36,7 @@ def solve_heuristic(inst: Instance, max_ops: int | None = None) -> HeuristicResu
 
     def closure() -> None:
         nonlocal n_tra
-        moved = True
-        while moved:
-            moved = False
-            for st in yard:
-                if not st:
-                    continue
-                c = st[-1]
-                vs, vt = slot_of[c]
-                if len(vessel[vs]) == vt and height_ok(vs):
-                    vessel[vs].append(st.pop())
-                    n_tra += 1
-                    moved = True
+        n_tra += closure_crpsp(yard, vessel, slot_of)
 
     closure()
     while any(yard) and n_rel + n_tra < cap:

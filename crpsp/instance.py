@@ -60,3 +60,23 @@ def generate_instance(n: int, s_y: int, s_v: int, t_y: int, rng: random.Random) 
 def slot_map(inst: Instance) -> dict[int, tuple[int, int]]:
     """Container id -> (vessel stack index, tier index)."""
     return {c: (vs, vt) for vs, stack in enumerate(inst.stowage) for vt, c in enumerate(stack)}
+
+
+def load_caserta(path) -> Instance:
+    """Standard-CRP loader for the Caserta/Schwarze/Voss BRP format.
+
+    Line 1: '<n_stacks> <n_containers>'; line i+1: '<count> <ids bottom->top>'.
+    Yard height limit follows the CV convention H_max = H + 2. Container ids
+    double as retrieval priorities (1 = retrieved first).
+    """
+    import pathlib
+
+    lines = [ln.split() for ln in pathlib.Path(path).read_text().splitlines() if ln.strip()]
+    n_stacks, n = int(lines[0][0]), int(lines[0][1])
+    yard = []
+    for row in lines[1:1 + n_stacks]:
+        cnt = int(row[0])
+        yard.append(tuple(int(v) for v in row[1:1 + cnt]))
+    h = max((len(s) for s in yard), default=0)
+    return Instance(yard=tuple(yard), stowage=(), t_y=h + 2, mode="crp",
+                    priorities=tuple(range(1, n + 1)))

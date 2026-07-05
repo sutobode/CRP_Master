@@ -5,6 +5,7 @@ import numpy as np
 
 from .instance import Instance, slot_map
 from .lower_bound import lower_bound, must_precede_pairs
+from .transfer import closure_crp, closure_crpsp
 
 
 class CRPSPEnv:
@@ -13,21 +14,27 @@ class CRPSPEnv:
     Follows the paper's State Transition: after each relocation, every feasible
     transfer executes immediately (respecting Eq 23), then control returns to
     the agent. Reward per Eq (36) with configurable terminal bonus (notes #1).
+
+    CRP mode (extension): retrieval by priority order instead of a stowage
+    plan; `restricted=True` limits relocation sources to the stack holding
+    the current retrieval target (restricted CRP variant).
     """
 
     def __init__(self, reward_mode: str = "designed", terminal_bonus: float = 10.0,
-                 max_steps: int = 50):
+                 max_steps: int = 50, restricted: bool = False):
         assert reward_mode in ("designed", "simple")
         self.reward_mode = reward_mode
         self.terminal_bonus = terminal_bonus
         self.max_steps = max_steps
+        self.restricted = restricted
 
     # ------------------------------------------------------------------ setup
     def reset(self, instance: Instance):
         self.inst = instance
         self.yard: list[list[int]] = [list(s) for s in instance.yard]
         self.vessel: list[list[int]] = [[] for _ in range(instance.s_v)]
-        self.slot_of = slot_map(instance)
+        self.slot_of = slot_map(instance) if instance.mode == "crpsp" else None
+        self.next_priority = 1
         self.precede = must_precede_pairs(instance)
         self.action_pairs = [(s, d) for s in range(instance.s_y)
                              for d in range(instance.s_y) if d != s]
@@ -67,33 +74,29 @@ class CRPSPEnv:
     def _all_placed(self) -> bool:
         return all(not s for s in self.yard)
 
-    def _height_ok(self, vs: int) -> bool:
-        """Eq (23): after adding to vessel stack vs, nearer-shore stacks stay <= farther."""
-        h_new = len(self.vessel[vs]) + 1
-        return all(len(self.vessel[j]) >= h_new for j in range(vs))
-
     def _transfer_closure(self) -> None:
-        moved = True
-        while moved:
-            moved = False
-            for stack in self.yard:
-                if not stack:
-                    continue
-                c = stack[-1]
-                vs, vt = self.slot_of[c]
-                if len(self.vessel[vs]) == vt and self._height_ok(vs):
-                    stack.pop()
-                    self.vessel[vs].append(c)
-                    self.n_transfers += 1
-                    moved = True
+        if self.inst.mode == "crp":
+            n, self.next_priority = closure_crp(self.yard, self.next_priority)
+        else:
+            n = closure_crpsp(self.yard, self.vessel, self.slot_of)
+        self.n_transfers += n
 
     def _obs(self) -> np.ndarray:
         return self.encode(self.yard, self.inst.s_y, self.inst.t_y, self.inst.n)
 
     def _mask(self) -> np.ndarray:
         m = np.zeros(len(self.action_pairs), dtype=bool)
+        allowed_source = None
+        if self.restricted and self.inst.mode == "crp" and not self.done:
+            for si, stack in enumerate(self.yard):
+                if self.next_priority in stack:
+                    allowed_source = si
+                    break
         for i, (s, d) in enumerate(self.action_pairs):
-            m[i] = bool(self.yard[s]) and len(self.yard[d]) < self.inst.t_y
+            ok = bool(self.yard[s]) and len(self.yard[d]) < self.inst.t_y
+            if allowed_source is not None:
+                ok = ok and s == allowed_source
+            m[i] = ok
         return m
 
     @staticmethod

@@ -12,7 +12,22 @@ def test_generate_basic_properties():
     ids = sorted(c for st in inst.yard for c in st)
     assert ids == list(range(1, 16))                    # every container exactly once in yard
     assert all(len(st) <= inst.t_y for st in inst.yard)  # yard height limit
+    assert all(len(st) <= inst.t_y for st in inst.stowage)  # vessel height limit (Table 1: shared K)
     assert sorted(c for st in inst.stowage for c in st) == list(range(1, 16))
+
+
+def test_vessel_capacity_never_exceeded_at_paper_scale():
+    # Table 3 config (20, 5, 5, 5): 20 containers, 5 vessel stacks, cap 5 tiers each
+    # (uncapped random assignment would frequently overflow a stack here).
+    rng = random.Random(0)
+    for _ in range(200):
+        inst = generate_instance(20, 5, 5, 5, rng)
+        assert all(len(st) <= 5 for st in inst.stowage)
+
+
+def test_vessel_capacity_error():
+    with pytest.raises(ValueError):
+        generate_instance(n=20, s_y=10, s_v=3, t_y=5, rng=random.Random(0))
 
 
 def test_stowage_heights_nonincreasing_toward_shore():

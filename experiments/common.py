@@ -26,6 +26,19 @@ def parse_args(description: str, extra: list[tuple[str, dict]] | None = None) ->
     return args
 
 
+def astar_time_limit(args: argparse.Namespace) -> float:
+    """A* per-instance time budget: paper uses up to 1000s (Table 3/4 methodology)
+    for --full runs; smoke runs cap tightly so a hard random instance can never
+    turn a wiring check into a multi-minute, multi-GB search (Global Constraints)."""
+    return 1000.0 if args.full else 5.0
+
+
+def astar_node_limit(args: argparse.Namespace) -> int | None:
+    """Extra memory safety net for smoke runs (the time check only happens once
+    per popped node, so an unlucky hard instance could still balloon memory)."""
+    return None if args.full else 200_000
+
+
 def write_csv(path: str | pathlib.Path, rows: list[dict]) -> None:
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -10,7 +10,7 @@ import time
 import numpy as np
 import torch
 
-from common import parse_args, write_csv
+from common import astar_node_limit, astar_time_limit, parse_args, write_csv
 
 from crpsp.astar import solve_astar
 from crpsp.evaluate import gap, rollout_policy
@@ -36,12 +36,14 @@ def main():
                                    torch.as_tensor(mask, device=device).unsqueeze(0))
         return int(logits.argmax())
 
+    limit = astar_time_limit(args)
+    node_cap = astar_node_limit(args)
     rng = random.Random(args.seed)
     rows = []
     for i in range(count):
         inst = generate_instance(cfg.n, cfg.s_y, cfg.s_v, cfg.t_y, rng)
         t0 = time.perf_counter()
-        opt = solve_astar(inst, time_limit_s=1000)
+        opt = solve_astar(inst, time_limit_s=limit, node_limit=node_cap)
         astar_s = time.perf_counter() - t0
         out = rollout_policy(policy, inst, {"reward_mode": cfg.reward_mode,
                                             "terminal_bonus": cfg.terminal_bonus,

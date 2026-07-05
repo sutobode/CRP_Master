@@ -34,9 +34,12 @@ def generate_instance(n: int, s_y: int, s_v: int, t_y: int, rng: random.Random) 
     """
     if n > s_y * t_y:
         raise ValueError(f"yard capacity {s_y * t_y} cannot hold {n} containers")
+    if n > s_v * t_y:
+        raise ValueError(f"vessel capacity {s_v * t_y} cannot hold {n} containers")
     counts = [0] * s_v
     for _ in range(n):
-        counts[rng.randrange(s_v)] += 1
+        open_idx = [i for i in range(s_v) if counts[i] < t_y]
+        counts[rng.choice(open_idx)] += 1
     counts.sort(reverse=True)             # index 0 (furthest from shore) tallest
     stowage: list[list[int]] = [[0] * h for h in counts]
     label = 1

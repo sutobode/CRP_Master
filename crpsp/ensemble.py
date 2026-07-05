@@ -38,12 +38,16 @@ def vote(actors: list[Actor], obs: np.ndarray, mask: np.ndarray, device) -> int:
     return max(sums, key=sums.get)
 
 
-def build_stacking_dataset(actors: list[Actor], instances: list[Instance], device):
+def build_stacking_dataset(actors: list[Actor], instances: list[Instance], device,
+                           time_limit_s: float | None = None):
     """(state, optimal action) pairs from A* trajectories (Eq 41-44);
-    features = concatenated per-model probability vectors (Eq 45)."""
+    features = concatenated per-model probability vectors (Eq 45).
+
+    Instances where A* does not prove optimality within `time_limit_s` are
+    skipped (no ground-truth label to train on)."""
     X, y = [], []
     for inst in instances:
-        res = solve_astar(inst)
+        res = solve_astar(inst, time_limit_s=time_limit_s)
         if not res.optimal:
             continue
         pairs = [(s, d) for s in range(inst.s_y) for d in range(inst.s_y) if d != s]

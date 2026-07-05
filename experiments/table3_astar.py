@@ -5,7 +5,7 @@ Smoke: first two configs x 3 instances.
 import random
 import time
 
-from common import parse_args, write_csv
+from common import astar_node_limit, astar_time_limit, parse_args, write_csv
 
 from crpsp.astar import solve_astar
 from crpsp.instance import generate_instance
@@ -19,6 +19,8 @@ def main():
     args = parse_args(__doc__)
     grid = FULL_GRID if args.full else FULL_GRID[:2]
     count = FULL_COUNT if args.full else 3
+    limit = astar_time_limit(args)
+    node_cap = astar_node_limit(args)
     rng = random.Random(args.seed)
     rows = []
     for (n, s_y, s_v, t_y) in grid:
@@ -26,7 +28,7 @@ def main():
         for _ in range(count):
             inst = generate_instance(n, s_y, s_v, t_y, rng)
             t0 = time.perf_counter()
-            res = solve_astar(inst, time_limit_s=1000)
+            res = solve_astar(inst, time_limit_s=limit, node_limit=node_cap)
             times.append(time.perf_counter() - t0)
             ok += int(res.optimal)
         rows.append({"N": n, "S_y": s_y, "S_v": s_v, "T_y": t_y,

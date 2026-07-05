@@ -11,7 +11,7 @@ import time
 import numpy as np
 import torch
 
-from common import parse_args, write_csv
+from common import astar_node_limit, astar_time_limit, parse_args, write_csv
 
 from crpsp.astar import solve_astar
 from crpsp.ensemble import build_stacking_dataset, train_stacking, vote
@@ -43,11 +43,13 @@ def main():
     device = torch.device("cpu" if not torch.cuda.is_available() else "cuda")
     n_eval = 200 if args.full else 3
     n_stack = args.stacking_instances if args.full else 3
+    limit = astar_time_limit(args)
+    node_cap = astar_node_limit(args)
     rng = random.Random(args.seed)
 
     stack_insts = [generate_instance(cfg.n, cfg.s_y, cfg.s_v, cfg.t_y, rng)
                    for _ in range(n_stack)]
-    X, y = build_stacking_dataset(actors, stack_insts, device)
+    X, y = build_stacking_dataset(actors, stack_insts, device, time_limit_s=limit)
     stack_pol = train_stacking(X, y, cfg.s_y * (cfg.s_y - 1)) if len(y) else None
 
     env_kwargs = {"reward_mode": cfg.reward_mode,
@@ -59,7 +61,7 @@ def main():
         gaps, times, solved_n = [], [], 0
         for _ in range(n_eval):
             inst = generate_instance(cfg.n, cfg.s_y, cfg.s_v, cfg.t_y, rng)
-            opt = solve_astar(inst, time_limit_s=1000)
+            opt = solve_astar(inst, time_limit_s=limit, node_limit=node_cap)
 
             if method == "voting":
                 def pol(obs, mask):

@@ -9,7 +9,7 @@ import time
 import numpy as np
 import torch
 
-from common import parse_args, write_csv
+from common import astar_node_limit, astar_time_limit, parse_args, write_csv
 
 from crpsp.astar import solve_astar
 from crpsp.ensemble import vote
@@ -29,13 +29,15 @@ def main():
     if args.ckpt_dir:
         from table8_ensemble import load_actors
         actors, cfg = load_actors(args.ckpt_dir)
+    limit = astar_time_limit(args)
+    node_cap = astar_node_limit(args)
     rng = random.Random(args.seed)
     rows = []
     for n in NS:
         h_gaps, h_times, v_gaps, v_times = [], [], [], []
         for _ in range(count):
             inst = generate_instance(n, s_y, s_v, t_y, rng)
-            opt = solve_astar(inst, time_limit_s=1000)
+            opt = solve_astar(inst, time_limit_s=limit, node_limit=node_cap)
             t0 = time.perf_counter()
             h = solve_heuristic(inst)
             h_times.append(time.perf_counter() - t0)

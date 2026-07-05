@@ -2,6 +2,8 @@
 
 Faithful reproduction of **Du et al. (2026)**, *An automated slot stowage optimization method for container ship based on improved Actor-Critic algorithm*, Ocean Engineering 350, 124255.
 
+> 📄 **Paper PDF:** `Paper/1-s2.0-S0029801826000892-main.pdf`
+
 ## Overview
 
 Solves the **Slot Planning Problem (SPP)** — assigning containers to individual slots within a bay of a container ship — using Deep Reinforcement Learning. Handles mixed 20-ft and 40-ft containers under seaworthiness constraints.

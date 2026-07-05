@@ -1,0 +1,22 @@
+env:
+  n: 15
+  s_y: 5
+  s_v: 5
+  t_y: 5
+  reward_mode: designed      # designed | simple   (Section 5.5)
+  terminal_bonus: 10.0       # paper: "large positive reward", value unspecified — see notes
+  max_steps: 50              # Table 10: max attempt times T
+model:
+  hidden_dim: 128            # Table 10
+  use_attention: true        # false => Section 5.4 no-attention ablation
+train:
+  lr: 5.0e-4                 # Table 10, actor and critic
+  gamma: 0.4                 # Table 10
+  gae_lambda: 0.9            # Table 10
+  clip_eps: 0.15             # Table 10
+  batch_size: 10             # Table 10
+  instances_per_iter: 10     # Table 10: M
+  iterations: 1000
+  ppo_epochs: 1              # Algorithm 1 shows a single pass — see notes
+  seed: 42
+  device: auto               # auto => cuda if available else cpu

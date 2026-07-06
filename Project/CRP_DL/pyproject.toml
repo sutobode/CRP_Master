@@ -1,0 +1,14 @@
+[project]
+name = "crpsp"
+version = "0.1.0"
+description = "Faithful reproduction of Wang et al. (2025) CRPSP hybrid learning algorithms"
+requires-python = ">=3.11"
+dependencies = ["torch", "ortools", "xgboost", "scikit-learn", "numpy", "pyyaml"]
+
+[tool.setuptools.packages.find]
+include = ["crpsp*", "spp_ac*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: excluded by default; run with -m slow"]
+addopts = "-m 'not slow'"
